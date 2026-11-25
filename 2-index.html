@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>قسّمها - تقسيم حساب المطعم</title>
+<meta name="description" content="قسّم حساب المطعم أو الخروجة بين صحابك بالعدل: كل واحد وطلبه، الخدمة والضريبة، ومين يدفع لمين.">
+<style>
+*{box-sizing:border-box}body{margin:0;background:#12161c;color:#eef1f4;font-family:Tahoma,Arial,sans-serif;display:flex;justify-content:center}
+.app{width:100%;max-width:560px;padding:16px}
+h1{text-align:center;color:#4ade80;font-size:24px;margin:6px 0}.sub{text-align:center;color:#8a97a6;font-size:13px;margin-bottom:14px}
+.card{background:#1b222b;border:1px solid #2c3743;border-radius:14px;padding:14px;margin-bottom:12px}
+h2{font-size:15px;margin:0 0 10px;color:#9ae6b4}
+input,select{font-family:inherit;font-size:15px;background:#0f1318;border:1px solid #2c3743;color:#fff;border-radius:9px;padding:9px;width:100%}
+.row{display:flex;gap:8px;margin-bottom:8px;align-items:center}.row>*{flex:1}.row .sm{flex:0 0 78px}.row .x{flex:0 0 38px;background:#3a1f1f;color:#f99;border:0;border-radius:9px;height:38px;cursor:pointer}
+button.b{font-family:inherit;font-size:15px;background:#4ade80;color:#0b1a10;border:0;border-radius:10px;padding:10px 14px;font-weight:bold;cursor:pointer}
+button.g{background:#26323f;color:#fff}
+.tot{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #2c3743;font-size:15px}
+.big{font-size:18px;color:#4ade80;font-weight:bold}.who{display:flex;gap:6px;flex-wrap:wrap}.who label{background:#0f1318;border:1px solid #2c3743;border-radius:999px;padding:4px 10px;font-size:13px;cursor:pointer}
+.who input{display:none}.who label.on{background:#4ade80;color:#0b1a10;border-color:#4ade80}
+.pay{padding:8px 0;border-bottom:1px dashed #2c3743}
+</style></head><body><div class="app">
+<h1>🧾 قسّمها</h1><div class="sub">حساب الخروجة بالعدل، من غير مشاكل ولا آلة حاسبة</div>
+<div class="card"><h2>مين كان معانا؟</h2><div id="people"></div><button class="b g" id="addP">+ شخص</button></div>
+<div class="card"><h2>الأكل والمشاريب (حدد مين شارك في كل صنف، ولو مفيش حد محدد يتقسم على الكل)</h2><div id="items"></div><button class="b g" id="addI">+ صنف</button></div>
+<div class="card"><h2>الخدمة والضريبة والخصم</h2>
+<div class="row"><span>خدمة %</span><input class="sm" id="svc" type="number" value="12" min="0"><span>ضريبة %</span><input class="sm" id="tax" type="number" value="14" min="0"></div>
+<div class="row"><span>خصم (جنيه)</span><input class="sm" id="disc" type="number" value="0" min="0"><span>بقشيش (جنيه)</span><input class="sm" id="tip" type="number" value="0" min="0"></div>
+<div class="row"><span>مين دفع الحساب؟</span><select id="payer"></select></div></div>
+<div class="card"><h2>النتيجة</h2><div id="res"></div><div id="settle"></div>
+<div class="row" style="margin-top:10px"><button class="b" id="copy">انسخ الحساب</button><button class="b g" id="link">انسخ لينك</button></div><div id="msg" class="sub"></div></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+let S={p:["أنا","صاحبي"],i:[{n:"بيتزا",pr:200,w:[0,1]}],svc:12,tax:14,disc:0,tip:0,payer:0};
+function load(){try{if(location.hash.length>2){S=JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(1)))))}}catch(e){}}
+function save(){try{history.replaceState(null,"","#"+btoa(unescape(encodeURIComponent(JSON.stringify(S)))))}catch(e){}}
+function calc(){
+ const n=S.p.length,sub=S.i.reduce((a,b)=>a+(+b.pr||0),0);
+ const own=Array(n).fill(0);
+ S.i.forEach(it=>{let w=(it.w||[]).filter(k=>k<n);if(!(+it.pr))return;if(!w.length)w=S.p.map((_,k)=>k);w.forEach(k=>own[k]+=it.pr/w.length)});
+ const un=sub-own.reduce((a,b)=>a+b,0);
+ const ratio=sub>0?1:0;
+ const disc=+S.disc||0,afterD=Math.max(0,sub-disc);
+ const svc=afterD*(+S.svc||0)/100,tax=(afterD+svc)*(+S.tax||0)/100,tip=+S.tip||0;
+ const total=afterD+svc+tax+tip;
+ const f=sub>0?total/sub:0,share=own.map(v=>v*f);
+ return {sub,own,share,total,svc,tax,tip,disc,un};
+}
+const fm=v=>(Math.round(v*100)/100).toLocaleString("ar-EG",{maximumFractionDigits:2})+" ج";
+function render(){
+ $("people").innerHTML="";S.p.forEach((nm,k)=>{const r=document.createElement("div");r.className="row";r.innerHTML='<input value="'+nm.replace(/"/g,"&quot;")+'"><button class="x">✕</button>';
+  r.children[0].oninput=e=>{S.p[k]=e.target.value;upd(false)};r.children[1].onclick=()=>{if(S.p.length<2)return;S.p.splice(k,1);S.i.forEach(it=>it.w=(it.w||[]).filter(x=>x!==k).map(x=>x>k?x-1:x));if(S.payer>=S.p.length)S.payer=0;else if(S.payer>k)S.payer--;render()};$("people").appendChild(r)});
+ $("items").innerHTML="";S.i.forEach((it,k)=>{const d=document.createElement("div");d.style.marginBottom="12px";
+  d.innerHTML='<div class="row"><input placeholder="اسم الصنف" value="'+(it.n||"").replace(/"/g,"&quot;")+'"><input class="sm" type="number" min="0" value="'+it.pr+'"><button class="x">✕</button></div><div class="who"></div>';
+  d.querySelectorAll("input")[0].oninput=e=>{it.n=e.target.value;upd(false)};d.querySelectorAll("input")[1].oninput=e=>{it.pr=+e.target.value||0;upd(false)};d.querySelector(".x").onclick=()=>{S.i.splice(k,1);render()};
+  const w=d.querySelector(".who");S.p.forEach((nm,j)=>{const l=document.createElement("label");l.textContent=nm||"؟";if((it.w||[]).includes(j))l.classList.add("on");l.onclick=()=>{it.w=it.w||[];const q=it.w.indexOf(j);q>=0?it.w.splice(q,1):it.w.push(j);render()};w.appendChild(l)});
+  const all=document.createElement("label");all.textContent="الكل";all.onclick=()=>{it.w=S.p.map((_,j)=>j);render()};w.appendChild(all);
+  $("items").appendChild(d)});
+ $("payer").innerHTML=S.p.map((nm,k)=>'<option value="'+k+'"'+(k===S.payer?" selected":"")+">"+(nm||"؟")+"</option>").join("");
+ ["svc","tax","disc","tip"].forEach(k=>$(k).value=S[k]);upd(false)}
+function upd(){const c=calc();let h="";
+ h+='<div class="tot"><span>مجموع الأصناف</span><b>'+fm(c.sub)+"</b></div>";
+ if(c.disc)h+='<div class="tot"><span>خصم</span><b>-'+fm(c.disc)+"</b></div>";
+ h+='<div class="tot"><span>خدمة</span><b>'+fm(c.svc)+"</b></div><div class=\"tot\"><span>ضريبة</span><b>"+fm(c.tax)+"</b></div>";
+ if(c.tip)h+='<div class="tot"><span>بقشيش</span><b>'+fm(c.tip)+"</b></div>";
+ h+='<div class="tot big"><span>الإجمالي</span><b>'+fm(c.total)+"</b></div>";
+ if(c.un>0.01)h+='<div class="sub" style="color:#f6ad55">⚠️ فيه أصناف مش محدد مين شارك فيها ('+fm(c.un)+") ومش محسوبة على حد</div>";
+ h+="<h2 style=\"margin-top:12px\">نصيب كل واحد</h2>";S.p.forEach((nm,k)=>h+='<div class="tot"><span>'+esc(nm||"؟")+"</span><b>"+fm(c.share[k])+"</b></div>");
+ $("res").innerHTML=h;
+ let s="<h2 style=\"margin-top:12px\">مين يدفع لمين</h2>";const py=S.payer;let any=false;
+ S.p.forEach((nm,k)=>{if(k!==py&&c.share[k]>0.005){any=true;s+='<div class="pay">'+esc(nm||"؟")+" يدفع لـ "+esc(S.p[py]||"؟")+": <b>"+fm(c.share[k])+"</b></div>"}});
+ if(!any)s+='<div class="sub">لسه مفيش حاجة</div>';$("settle").innerHTML=s;save()}
+function esc(t){return String(t).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]))}
+function text(){const c=calc();let t="🧾 حساب الخروجة\n";S.p.forEach((nm,k)=>t+=nm+": "+fm(c.share[k])+"\n");t+="الإجمالي: "+fm(c.total);const py=S.payer;S.p.forEach((nm,k)=>{if(k!==py&&c.share[k]>0.005)t+="\n"+nm+" يدفع لـ "+S.p[py]+": "+fm(c.share[k])});return t}
+$("addP").onclick=()=>{S.p.push("");render()};$("addI").onclick=()=>{S.i.push({n:"",pr:0,w:S.p.map((_,k)=>k)});render()};
+["svc","tax","disc","tip"].forEach(k=>$(k).oninput=e=>{S[k]=+e.target.value||0;upd()});$("payer").onchange=e=>{S.payer=+e.target.value;upd()};
+const cp=(t,b)=>{(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>$("msg").textContent=b,()=>$("msg").textContent="انسخ يدوي: "+t.slice(0,60))};
+$("copy").onclick=()=>cp(text(),"اتنسخ الحساب ✅");$("link").onclick=()=>cp(location.href,"اتنسخ اللينك ✅");
+load();render();
+</script></body></html>
